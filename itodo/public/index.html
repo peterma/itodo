@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>iTo-Do</title>
+
+<link rel="stylesheet" href="css/bootstrap-3.3.4/css/bootstrap.css">
+<link rel="stylesheet" href="css/bootstrap-3.3.4/css/bootstrap-theme.css">
+<link rel="stylesheet" href="css/common.css">
+
+<script src="js/jquery-1.11.3.js"></script>
+<script src="js/angular.js"></script>
+<!-- 
+<script src="js/angular-ui-form-validation.js"></script>
+ -->
+<script src="js/itodo-datetime.js"></script>
+<script src="js/itodo-countdown.js"></script>
+<script src="js/itodo-heart.js"></script>
+<script src="js/itodo-star.js"></script>
+<script src="js/itodo-service-date.js"></script>
+<script src="js/underscore.js"></script>
+<script src="js/moment.js"></script>
+<script src="js/bootstrap.js"></script>
+<script src="js/common.js"></script>
+
+</head>
+<body ng-app="iToDo">
+	
+	<ul class="nav nav-tabs">
+		<li class="active">
+			<a href="#list" data-toggle="tab">List</a>
+		</li>
+		<li>
+			<a href="#add" data-toggle="tab">Add</a>
+		</li>
+		<li>
+			<a href="#search" data-toggle="tab">Search</a>
+		</li>
+		<li>
+			<a href="#share" data-toggle="tab">Share</a>
+		</li>
+		<li>
+			<a href="#settings" data-toggle="tab">Settings</a>
+		</li>
+	</ul>
+	
+	<div class="tab-content">
+		<div class="tab-pane active" id="list">
+			<div ng-controller="listTodoController">
+				<table class="table">
+					<thead>
+						<!-- Use bootstrap grid layout instead. -->
+						<tr>
+							<td style="width:6%">ID</td>
+							<td style="width:42%">Task</td>
+							<td style="width:8%">Start Date</td>
+							<td style="width:8%">Deadline</td>
+							<td style="width:8%">
+								<span>Priority</span>
+								<span ng-click="sortByPriority()" ng-show="pAsc"><strong>&uarr;</strong></span>
+								<span ng-click="sortByPriority()" ng-hide="pAsc"><strong>&darr;</strong></span>
+							</td>
+							<td style="width:9%">Mood</td>
+							<td style="width:9%">Confidence</td>
+							<td style="width:10%">Operation</td>
+						</tr>
+					</thead>
+					<tbody>
+						<tr ng-show="!todos.length">
+							<td colspan="8"><p style="text-align : center; color : red;">No records.</p></td>
+						</tr>
+						<tr ng-repeat="todo in todos | orderBy:sortPriorities" ng-class="isFinished(todo)">
+							<td><span ng-bind="todo.id"></span></td>
+							<td><span ng-bind="todo.task"></span></td>
+							<td><span ng-bind="todo.startDate"></span></td>
+							<td><span ng-bind="todo.deadline"></span></td>
+							<td><span ng-bind="todo.priority | priority"></span></td>
+							<td><span ng-repeat="heart in todo.mood" class="glyphicon" ng-class="{{heart.value}} | heart"></span></td>
+							<td><span ng-repeat="star in todo.confidence" class="glyphicon" ng-class="{{star.value}} | star"></span></td>
+							<td>
+								<span class="glyphicon glyphicon-pencil" role="button" ng-click="showEditDialog(todo)"></span>&nbsp;&nbsp;
+								<span class="glyphicon glyphicon-ok" role="button" ng-disabled="todo.finished" ng-click="completeTodo(todo)"></span>&nbsp;&nbsp;
+								<!-- TODO pop-up a confirm dialog. -->
+								<span class="glyphicon glyphicon-remove" role="button" ng-click="deleteTodo(todo)"></span>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+				
+				<div ng-controller="editTodoController" class="modal" id="editDialog" ng-class="hasCurrentTodo()" tabindex="-1">
+					<div class="modal-dialog">
+						<div class="modal-content">
+							<div class="modal-header">
+								<a href="#" class="close" ng-click="closeModal()">&times;</a>
+								<h4>Edit TODO</h4>
+							</div>
+							<form name="editTodoForm" ng-submit="editSubmit()">
+								<div class="modal-body">
+									<div class="row">
+										<div class="col-xs-4 text-right"><label>Task :</label></div>
+										<div class="col-xs-8"><input type="text" class="long-text" required ng-model="todo.task" maxlength="100"/></div>
+									</div>
+									<div class="row">
+										<div class="col-xs-4 text-right"><label>Priority :</label></div>
+										<div class="col-xs-8">
+											<select ng-model="todo.priority" ng-options="level.value as level.name for level in priorities"></select>
+										</div>
+									</div>
+									<div class="row">
+										<div class="col-xs-4 text-right"><label>Start Date :</label></div>
+										<div class="col-xs-8">
+											<div itodo-datetime todo-date="todo.startDate"></div>
+										</div>
+									</div>
+									<div class="row">
+										<div class="col-xs-4 text-right"><label>Deadline :</label></div>
+										<div class="col-xs-8">
+											<div itodo-datetime todo-date="todo.deadline"></div>
+											<span ng-class="durationError()">{{todo.duration}}</span>
+											<div itodo-countdown countdown="todo.countdown"></div>
+										</div>
+									</div>
+									<div class="row">
+										<div class="col-xs-4 text-right"><label>Mood :</label></div>
+										<div class="col-xs-8">
+											<div itodo-heart mood="todo.mood"></div>
+										</div>
+									</div>
+									<div class="row">
+										<div class="col-xs-4 text-right"><label>Confidence :</label></div>
+										<div class="col-xs-8">
+											<div itodo-star confidence="todo.confidence"></div>
+										</div>
+									</div>
+									<div class="row">
+										<div class="col-xs-4 text-right"><label>Want Some Help :</label></div>
+										<div class="col-xs-8">
+											<input type="checkbox" ng-model="todo.needHelp" ng-click="addRequiredAttr()">&nbsp;Get Help<br>
+											<input type="text" ng-show="todo.needHelp" validation-field-required="{{needHelpRequired}}" class="long-text" ng-model="todo.msg2GetHelp" maxlength="100">
+										</div>
+									</div>
+								</div>
+							</form>
+							<div class="modal-footer">
+								<button class="btn btn-success" type="submit">OK</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		
+		<div class="tab-pane" id="add">
+			<div ng-controller="addTodoController">
+				<form name="addTodoForm" ng-submit="add()">
+					<div class="row">
+						<div class="col-xs-4 text-right"><label>Task :</label></div>
+						<div class="col-xs-8"><input type="text" class="long-text" required ng-model="todo.task" maxlength="100"/></div>
+					</div>
+					<div class="row">
+						<div class="col-xs-4 text-right"><label>Priority :</label></div>
+						<div class="col-xs-8">
+							<select ng-model="todo.priority" ng-options="level.value as level.name for level in priorities"></select>
+						</div>
+					</div>
+					<div class="row">
+						<div class="col-xs-4 text-right"><label>Start Date :</label></div>
+						<div class="col-xs-8">
+							<div itodo-datetime todo-date="todo.startDate"></div>
+						</div>
+					</div>
+					<div class="row">
+						<div class="col-xs-4 text-right"><label>Deadline :</label></div>
+						<div class="col-xs-8">
+							<div itodo-datetime todo-date="todo.deadline"></div>
+							<span ng-class="durationError()">{{todo.duration}}</span>
+							<div itodo-countdown countdown="todo.countdown"></div>
+						</div>
+					</div>
+					<div class="row">
+						<div class="col-xs-4 text-right"><label>Mood :</label></div>
+						<div class="col-xs-8">
+							<div itodo-heart mood="todo.mood"></div>
+						</div>
+					</div>
+					<div class="row">
+						<div class="col-xs-4 text-right"><label>Confidence :</label></div>
+						<div class="col-xs-8">
+							<div itodo-star confidence="todo.confidence"></div>
+						</div>
+					</div>
+					<div class="row">
+						<div class="col-xs-4 text-right"><label>Want Some Help :</label></div>
+						<div class="col-xs-8">
+							<input type="checkbox" ng-model="todo.needHelp" ng-click="addRequiredAttr()">&nbsp;Get Help<br>
+							<input type="text" ng-show="todo.needHelp" validation-field-required="{{needHelpRequired}}" class="long-text" ng-model="todo.msg2GetHelp" maxlength="100">
+						</div>
+					</div>
+					<div class="row">
+						<div class="col-xs-12 text-center">
+							<button class="btn btn-success" type="submit">Add</button>
+						</div>
+					</div>
+				</form>
+				
+				<div class="modal" id="sendDialog" tabindex="-1">
+					<div class="modal-dialog">
+						<div class="modal-content">
+							<div class="modal-header">
+								<a href="#" class="close" ng-click="closeModal()">&times;</a>
+								<h4>TODO Added</h4>
+							</div>
+							<div class="modal-body">
+								<p>Your new todo task has been added.</p>
+							</div>
+							<div class="modal-footer">
+								<button class="btn btn-success" type="button" ng-click="closeModal()">Close</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		
+		<div class="tab-pane" id="search">Search</div>
+		<div class="tab-pane" id="share">Share</div>
+		<div class="tab-pane" id="settings">Settings</div>
+	</div>
+	
+		
+</body>
+</html>
